@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Ra Sewing Monitor - Giám Sát Nút Nhấn Máy May</title>
+    
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Lucide Icons (CDN) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Chart.js (CDN) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- E-Ra Widget SDK (CDN) -->
+    <script src="https://www.unpkg.com/@eohjsc/era-widget@1.1.6/src/index.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header>
+            <div class="brand-section">
+                <div class="brand-icon">
+                    <i data-lucide="scissors"></i>
+                </div>
+                <div class="brand-title">
+                    <h1>MÁY MAY SEWING IoT</h1>
+                    <p>Hệ thống giám sát sản lượng công nhân theo thời gian thực</p>
+                </div>
+            </div>
+            
+            <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                <div class="demo-switch-container">
+                    <span class="switch-label">Chế độ Demo</span>
+                    <label class="switch">
+                        <input type="checkbox" id="demoModeToggle" onchange="toggleDemoMode()" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <div class="era-status-badge">
+                    <div id="eraStatusDot" class="status-dot"></div>
+                    <span id="eraStatusText">Đang khởi tạo E-Ra...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Summary Statistics Grid -->
+        <div class="summary-grid">
+            <div class="summary-card cyan">
+                <div class="summary-info">
+                    <h3>Tổng Thiết Bị</h3>
+                    <div id="statTotalNodes" class="value">0</div>
+                </div>
+                <div class="summary-icon">
+                    <i data-lucide="cpu"></i>
+                </div>
+            </div>
+            
+            <div class="summary-card green">
+                <div class="summary-info">
+                    <h3>Node Online</h3>
+                    <div id="statOnlineNodes" class="value">0</div>
+                </div>
+                <div class="summary-icon">
+                    <i data-lucide="wifi"></i>
+                </div>
+            </div>
+            
+            <div class="summary-card red">
+                <div class="summary-info">
+                    <h3>Node Offline</h3>
+                    <div id="statOfflineNodes" class="value">0</div>
+                </div>
+                <div class="summary-icon">
+                    <i data-lucide="wifi-off"></i>
+                </div>
+            </div>
+
+            <div class="summary-card amber">
+                <div class="summary-info">
+                    <h3>Pin Yếu (&lt; 20%)</h3>
+                    <div id="statLowBattery" class="value">0</div>
+                </div>
+                <div class="summary-icon">
+                    <i data-lucide="battery-warning" class="battery-critical"></i>
+                </div>
+            </div>
+
+            <div class="summary-card green">
+                <div class="summary-info">
+                    <h3>Pin Bình Thường</h3>
+                    <div id="statNormalBattery" class="value">0</div>
+                </div>
+                <div class="summary-icon">
+                    <i data-lucide="battery-charging" class="battery-good"></i>
+                </div>
+            </div>
+            
+            <div class="summary-card cyan">
+                <div class="summary-info">
+                    <h3>Tổng Sản Phẩm</h3>
+                    <div id="statTotalPressCount" class="value">0</div>
+                </div>
+                <div class="summary-icon">
+                    <i data-lucide="clipboard-check"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls & Navigation Tab Row -->
+        <div class="control-row">
+            <div class="nav-tabs">
+                <button class="tab-btn active" onclick="switchTab('dashboard')">
+                    <i data-lucide="layout-grid"></i> Dashboard
+                </button>
+                <button class="tab-btn" onclick="switchTab('grid')">
+                    <i data-lucide="map"></i> Sơ Đồ Nhà Máy (10K Grid)
+                </button>
+                <button class="tab-btn" onclick="switchTab('analytics')">
+                    <i data-lucide="trending-up"></i> Phân Tích
+                </button>
+                <button class="tab-btn" onclick="switchTab('config')">
+                    <i data-lucide="settings"></i> Cấu Hình E-Ra
+                </button>
+            </div>
+        </div>
+
+        <!-- Filter Bar (Shared across Dashboard and Factory Grid) -->
+        <div class="filter-bar">
+            <div class="search-wrapper">
+                <i data-lucide="search"></i>
+                <input type="text" id="nodeSearch" placeholder="Tìm kiếm theo ID máy / thiết bị..." oninput="handleSearch()">
+            </div>
+            
+            <div class="filter-group">
+                <select id="groupFilter" class="filter-select" onchange="handleFilters()">
+                    <option value="all">Tất cả Tổ sản xuất</option>
+                    <option value="Tổ 1">Tổ 1</option>
+                    <option value="Tổ 2">Tổ 2</option>
+                    <option value="Tổ 3">Tổ 3</option>
+                    <option value="Tổ 4">Tổ 4</option>
+                    <option value="Tổ 5">Tổ 5</option>
+                </select>
+
+                <select id="processFilter" class="filter-select" onchange="handleFilters()">
+                    <option value="all">Tất cả Công đoạn</option>
+                    <option value="May Cổ">May Cổ</option>
+                    <option value="Ráp Thân">Ráp Thân</option>
+                    <option value="Tra Khóa">Tra Khóa</option>
+                    <option value="Lên Gấu">Lên Gấu</option>
+                    <option value="Vắt Sổ">Vắt Sổ</option>
+                </select>
+
+                <select id="statusFilter" class="filter-select" onchange="handleFilters()">
+                    <option value="all">Tất cả Trạng thái</option>
+                    <option value="online">Online</option>
+                    <option value="offline">Offline</option>
+                </select>
+                
+                <select id="batteryFilter" class="filter-select" onchange="handleFilters()">
+                    <option value="all">Tất cả Mức pin</option>
+                    <option value="low">Pin yếu (&lt; 20%)</option>
+                    <option value="ok">Pin bình thường</option>
+                </select>
+
+                <select id="sortFilter" class="filter-select" onchange="handleSort()">
+                    <option value="id_asc">Sắp xếp: ID tăng dần</option>
+                    <option value="id_desc">Sắp xếp: ID giảm dần</option>
+                    <option value="press_desc">Sản phẩm: Nhiều nhất</option>
+                    <option value="press_asc">Sản phẩm: Ít nhất</option>
+                    <option value="battery_asc">Mức pin: Thấp nhất</option>
+                    <option value="rssi_desc">Tín hiệu: Khỏe nhất</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- TAB CONTENT: Dashboard Cards -->
+        <div id="tab-dashboard" class="tab-content active">
+            <!-- Nodes Card Grid -->
+            <div class="nodes-grid" id="nodesContainer">
+                <!-- Node cards will be populated dynamically -->
+            </div>
+
+            <!-- Pagination Row -->
+            <div class="pagination-container">
+                <div class="pagination-info" id="paginationInfo">
+                    Hiển thị 0 - 0 trong tổng số 0 thiết bị
+                </div>
+                
+                <div class="pagination-controls" id="paginationControls">
+                    <!-- Pagination buttons populated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB CONTENT: Factory Grid Map -->
+        <div id="tab-grid" class="tab-content">
+            <div class="factory-grid-panel">
+                <div class="factory-grid-header">
+                    <div>
+                        <h2>Sơ Đồ Trực Quan 10,000 Nút Nhấn</h2>
+                        <p style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">
+                            Bản đồ thu nhỏ biểu diễn toàn bộ thiết bị trong xưởng. Di chuột vào các ô để xem nhanh, click để xem chi tiết.
+                        </p>
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                        <div class="filter-group">
+                            <label style="font-size: 12px; color: var(--text-secondary); font-weight: 600;">Tùy chọn tô màu:</label>
+                            <select id="gridColorMode" class="filter-select" style="padding: 6px 12px; height: 32px;" onchange="handleGridColorModeChange()">
+                                <option value="status">Trạng Thái Kết Nối</option>
+                                <option value="group">Tổ Sản Xuất (Phân Khu)</option>
+                                <option value="process">Công Đoạn May</option>
+                            </select>
+                        </div>
+                        
+                        <div class="grid-legend" id="gridLegend">
+                            <div class="legend-item">
+                                <div class="legend-color online"></div>
+                                <span>Online</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color offline"></div>
+                                <span>Offline</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color unregistered"></div>
+                                <span>Chưa nhận tin</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="canvas-container">
+                    <canvas id="factoryCanvas" width="1200" height="600"></canvas>
+                </div>
+                
+                <div id="gridTooltip" class="grid-tooltip"></div>
+            </div>
+        </div>
+
+        <!-- TAB CONTENT: Analytics -->
+        <div id="tab-analytics" class="tab-content">
+            <div class="analytics-grid">
+                <div class="chart-card">
+                    <h3>Phân Phối Trạng Thái Thiết Bị</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="chart-card">
+                    <h3>Tỷ Lệ Mức Pin Các Thiết Bị</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="batteryChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <h3>Sản Lượng Theo Tổ Sản Xuất</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="groupProductionChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="chart-card">
+                    <h3>Sản Lượng Nổi Bật (Top 10 Máy May)</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="topProductionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB CONTENT: Config Guide -->
+        <div id="tab-config" class="tab-content">
+            <div class="config-panel">
+                <h2>Cấu Hình Kết Nối Trên E-Ra IoT Platform</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                    Để hiển thị dữ liệu thực tế từ thiết bị phần cứng lên iFrame này, bạn hãy làm theo các bước hướng dẫn dưới đây.
+                </p>
+
+                <div class="config-section">
+                    <h3>1. Định dạng JSON Payload của Thiết bị</h3>
+                    <p>Mỗi thiết bị nút nhấn của công nhân cần gửi dữ liệu dạng chuỗi JSON về một Virtual Pin trên E-Ra với cấu trúc mẫu như sau:</p>
+                    <pre>{
+  "node_id": 1,
+  "event": "press",
+  "press_count": 7,
+  "battery_mv": 380,
+  "battery_pct": 85,
+  "rssi": -51,
+  "online": true,
+  "last_seen_epoch": 1782449719,
+  "gateway_uptime_ms": 428777
+}</pre>
+                </div>
+
+                <div class="config-section">
+                    <h3>2. Cấu hình Widget iFrame trên Dashboard E-Ra</h3>
+                    <p>Trong giao diện Dashboard của E-Ra, bạn thêm một Widget iFrame và trỏ URL đến trang web này (ví dụ trang đã được deploy lên GitHub Pages).</p>
+                </div>
+
+                <div class="config-section">
+                    <h3>3. Liên kết Virtual Pin</h3>
+                    <p>Trong phần cài đặt Widget iFrame của E-Ra, liên kết datastream chứa Virtual Pin nhận tin nhắn JSON từ các nút nhấn máy may. SDK E-Ra Widget sẽ tự động bắt dữ liệu và cập nhật sơ đồ thời gian thực.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Node Detail Modal -->
+    <div id="nodeModal" class="modal-overlay" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="brand-icon" style="position: absolute; right: 20px; top: 20px; cursor: pointer; background: var(--bg-surface-hover); width: 32px; height: 32px; box-shadow: none;" onclick="closeModal()">
+                <i data-lucide="x" style="font-size: 16px;"></i>
+            </div>
+            
+            <div class="node-header" style="margin-bottom: 16px;">
+                <div class="node-title" id="modalTitle" style="font-size: 20px;">
+                    Node #0
+                </div>
+                <div class="node-badge" id="modalBadge">
+                    Online
+                </div>
+            </div>
+            
+            <div class="counter-section" style="margin-bottom: 20px; padding: 20px;">
+                <span>SẢN LƯỢNG HOÀN THÀNH</span>
+                <div class="counter-value" id="modalPressCount" style="font-size: 48px;">0</div>
+            </div>
+            
+            <div class="params-grid" style="gap: 12px; margin-bottom: 16px;">
+                <div class="param-item">
+                    <span class="param-label">Điện áp PIN</span>
+                    <span class="param-value" id="modalBattery">
+                        <i data-lucide="battery"></i> --
+                    </span>
+                </div>
+                <div class="param-item">
+                    <span class="param-label">Tín hiệu sóng RSSI</span>
+                    <span class="param-value" id="modalRssi">
+                        <i data-lucide="signal"></i> --
+                    </span>
+                </div>
+                <div class="param-item">
+                    <span class="param-label">Tổ Sản Xuất</span>
+                    <span class="param-value" id="modalGroup">
+                        <i data-lucide="users"></i> --
+                    </span>
+                </div>
+                <div class="param-item">
+                    <span class="param-label">Công Đoạn May</span>
+                    <span class="param-value" id="modalProcess">
+                        <i data-lucide="workflow"></i> --
+                    </span>
+                </div>
+                <div class="param-item">
+                    <span class="param-label">Uptime Cổng Gateway</span>
+                    <span class="param-value" id="modalUptime">
+                        <i data-lucide="clock"></i> --
+                    </span>
+                </div>
+                <div class="param-item">
+                    <span class="param-label">Mã Sự Kiện</span>
+                    <span class="param-value" id="modalEvent" style="text-transform: capitalize;">
+                        <i data-lucide="activity"></i> --
+                    </span>
+                </div>
+            </div>
+            
+            <div class="last-seen" id="modalLastSeen" style="text-align: left; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                Cập nhật lần cuối: --
+            </div>
+        </div>
+    </div>
+
+    <!-- Simulator Floating Panel Widget -->
+    <div class="simulator-widget">
+        <button class="sim-toggle-btn" onclick="toggleSimPanel()">
+            <i data-lucide="play-circle"></i> Trình Giả Lập 10K Node
+        </button>
+        
+        <div class="sim-panel" id="simPanel">
+            <div class="sim-header">
+                <h3>Bộ Giả Lập Dữ Liệu IoT</h3>
+                <button class="sim-close" onclick="toggleSimPanel()">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            
+            <div class="sim-field">
+                <label>Số lượng thiết bị nút nhấn</label>
+                <input type="range" id="simNodeCount" min="10" max="10000" step="10" value="1000" oninput="updateSimCountLabel()">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
+                    <span style="font-size: 10px; color: var(--text-muted);">Min: 10</span>
+                    <span id="simCountLabel">1,000 Node</span>
+                    <span style="font-size: 10px; color: var(--text-muted);">Max: 10,000</span>
+                </div>
+            </div>
+            
+            <div class="sim-field">
+                <label>Tốc độ bấm nút thực tế (Lần/giây)</label>
+                <input type="range" id="simPressRate" min="1" max="50" value="5" oninput="updateSimPressLabel()">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
+                    <span style="font-size: 10px; color: var(--text-muted);">Min: 1</span>
+                    <span id="simPressLabel">5 Lần/giây</span>
+                    <span style="font-size: 10px; color: var(--text-muted);">Max: 50</span>
+                </div>
+            </div>
+            
+            <div class="sim-field">
+                <label>Tỷ lệ thiết bị Offline (%)</label>
+                <input type="range" id="simOfflineRate" min="0" max="80" value="5" oninput="updateSimOfflineLabel()">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
+                    <span style="font-size: 10px; color: var(--text-muted);">0%</span>
+                    <span id="simOfflineLabel">5% Offline</span>
+                    <span style="font-size: 10px; color: var(--text-muted);">80%</span>
+                </div>
+            </div>
+
+            <button class="btn-danger-outline" onclick="triggerMassiveSimPresses()">
+                <i data-lucide="zap"></i> Giả lập Bấm Nút Hàng Loạt
+            </button>
+        </div>
+    </div>
+
+    <!-- Core App JS -->
+    <script src="app.js"></script>
+</body>
+</html>
