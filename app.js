@@ -16,7 +16,8 @@ const state = {
     sortBy: 'id_asc',
     gridColorMode: 'status', // 'status', 'group', 'process'
     pressRate: 5,            // Simulated presses per second
-    offlineRate: 5           // Percentage of simulated offline nodes
+    offlineRate: 5,          // Percentage of simulated offline nodes
+    heartbeatTimeout: 300    // Heartbeat timeout in seconds (default 5 minutes)
 };
 
 // Colors for Groups & Processes
@@ -40,6 +41,7 @@ const COLORS = {
 // Simulation Interval Hooks
 let simPressInterval = null;
 let simOfflineCheckInterval = null;
+let watchdogInterval = null;
 let uiUpdateScheduled = false;
 
 // Chart Instances
@@ -113,6 +115,9 @@ window.addEventListener('DOMContentLoaded', () => {
     
     // Draw initial charts
     initCharts();
+    
+    // Start Watchdog heartbeat check
+    startWatchdog();
 });
 
 /* ==========================================================================
@@ -1116,6 +1121,36 @@ function handleSort() {
     state.sortBy = document.getElementById('sortFilter').value;
     state.currentPage = 1;
     requestUpdateUI();
+}
+
+function handleHeartbeatTimeoutChange() {
+    const select = document.getElementById('heartbeatTimeout');
+    state.heartbeatTimeout = parseInt(select.value, 10);
+    requestUpdateUI();
+}
+
+function startWatchdog() {
+    if (watchdogInterval) clearInterval(watchdogInterval);
+    watchdogInterval = setInterval(() => {
+        if (state.demoMode) return; // Bypassed in simulator mode to preserve demo grid layout
+        
+        const nowEpoch = Math.floor(Date.now() / 1000);
+        let updated = false;
+        
+        Object.values(state.nodes).forEach(node => {
+            if (node.online) {
+                const inactiveSec = nowEpoch - node.last_seen_epoch;
+                if (inactiveSec > state.heartbeatTimeout) {
+                    node.online = false;
+                    updated = true;
+                }
+            }
+        });
+        
+        if (updated) {
+            requestUpdateUI();
+        }
+    }, 5000); // Check every 5 seconds
 }
 
 /* ==========================================================================

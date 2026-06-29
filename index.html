@@ -165,6 +165,14 @@
                     <option value="ok">Pin bình thường</option>
                 </select>
 
+                <select id="heartbeatTimeout" class="filter-select" onchange="handleHeartbeatTimeoutChange()">
+                    <option value="60">Mất kết nối: &gt; 1 phút</option>
+                    <option value="180">Mất kết nối: &gt; 3 phút</option>
+                    <option value="300" selected>Mất kết nối: &gt; 5 phút (Mặc định)</option>
+                    <option value="600">Mất kết nối: &gt; 10 phút</option>
+                    <option value="1800">Mất kết nối: &gt; 30 phút</option>
+                </select>
+
                 <select id="sortFilter" class="filter-select" onchange="handleSort()">
                     <option value="id_asc">Sắp xếp: ID tăng dần</option>
                     <option value="id_desc">Sắp xếp: ID giảm dần</option>
